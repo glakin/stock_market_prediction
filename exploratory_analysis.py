@@ -5,7 +5,7 @@ Created on Sun Aug  2 10:38:11 2020
 @author: Jerry
 """
 
-from fetch_functions import fetch_daily, fetch_intraday
+from fetch_functions import fetch_daily, fetch_intraday, fetch_technicals
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -51,3 +51,12 @@ ko_intraday_1min['5. volume'].plot()
 # We should also try to account for earnings calls which can lead to big swings
 # (e.g. Coca Cola had earnings on Jul 20 and opened ~2 pts up the next day)
 
+googl_technicals = fetch_technicals('GOOGL', interval='daily')
+googl_technicals['SMA'].plot()
+googl_technicals['MACD'].plot()
+googl_technicals['RSI'].plot()
+
+# Run bollinger bands on the same graph
+googl_technicals['Real Middle Band'].plot()
+googl_technicals['Real Lower Band'].plot()
+googl_technicals['Real Upper Band'].plot()

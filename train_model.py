@@ -34,6 +34,7 @@ except:
 
 input_data = df.to_numpy()
 days_history = len(input_data)
+ncols = len(df.columns)
 
 # Build a target dataset of the change in price between closes
 close = input_data[:,3][:]
@@ -84,7 +85,7 @@ np.random.seed(4)
 #from tensorflow import set_random_seed
 #set_random_seed(4)
 
-lstm_input = Input(shape=(sample_days, 14), name='lstm_input')
+lstm_input = Input(shape=(sample_days, ncols), name='lstm_input')
 x = LSTM(50, name='lstm_0')(lstm_input)
 x = Dropout(0.2, name='lstm_dropout_0')(x)
 x = Dense(64, name='dense_0')(x)

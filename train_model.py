@@ -28,17 +28,36 @@ else:
 df = pd.merge(prices, technicals, left_index=True, right_index=True).set_index('date_x', drop=True).drop('date_y', axis=1)
 df.index.names = ['date']
 
-# Normalize the data NEED TO MOVE THIS TO AFTER TRAINING/TEST SPLIT
-scaler = preprocessing.StandardScaler()
-norm_input = scaler.fit_transform(df)
+input_data = df.to_numpy()
+target = np.array([input_data[:,3][i + sample_days].copy() for i in range(len(input_data) - sample_days)])
+target = np.expand_dims(target, -1)
 
-# using the last {sample_days} open high low close volume data points, predict the next open value
-norm_history = np.array([norm_input[i  : i + sample_days].copy() for i in range(len(norm_input) - sample_days)])
-norm_target = np.array([norm_input[:,0][i + sample_days].copy() for i in range(len(norm_input) - sample_days)])
-norm_target = np.expand_dims(norm_target, -1)
+test_split = 0.9 
+n = int(input_data.shape[0] * test_split)
 
-next_day_open_values = np.array([df[:,0][i + sample_days].copy() for i in range(len(df) - sample_days)])
-next_day_open_values = np.expand_dims(norm_target, -1)
+input_train = input_data[:n,:]
+input_test = input_data[n:,:]
 
-y_normaliser = preprocessing.MinMaxScaler()
-y_normaliser.fit(np.expand_dims( next_day_open_values ))
+target_train = target[:n]
+target_test = target[n:]
+
+scaler_input_train = preprocessing.StandardScaler()
+scaler_input_test = preprocessing.StandardScaler()
+
+input_train_norm = scaler_input_train.fit_transform(input_train)
+input_test_norm = scaler_input_test.fit_transform(input_test)
+
+# using the last {sample_days} open high low close volume data points, predict the next close value
+history_train = np.array([input_train_norm[i  : i + sample_days].copy() for i in range(len(input_train_norm) - sample_days)])
+history_test = np.array([input_test_norm[i  : i + sample_days].copy() for i in range(len(input_test_norm) - sample_days)])
+
+y_train_scaler = preprocessing.StandardScaler()
+y_train_scaler.fit(target_train)
+y_train_norm = y_train_scaler.transform(target_train)
+
+y_test_scaler = preprocessing.StandardScaler()
+y_test_scaler.fit(target_test)
+y_test_norm = y_test_scaler.transform(target_test) 
+
+# assert history_train.shape[0] == y_train_norm.shape[0]
+

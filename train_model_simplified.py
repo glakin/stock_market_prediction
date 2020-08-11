@@ -1,5 +1,5 @@
 
-from fetch_functions import fetch_technicals, fetch_daily
+from fetch_functions import fetch_technicals, fetch_daily, fetch_intraday, fetch_daily_adjusted
 import pandas as pd
 import numpy as np
 import time
@@ -11,7 +11,7 @@ current_date = date.today()
 sample_days = 50
 
 # Stock symbol to train the model with
-symbol = "NFLX"
+symbol = "GE"
 
 # Load technicals and price data
 # Write/read from csv to reduce API calls
@@ -20,14 +20,17 @@ if path.exists("./data/{}_technicals_{}.csv".format(symbol, current_date)):
 else:
     technicals = fetch_technicals(symbol, interval = "daily", save_csv = True)
     time.sleep(60)
-if path.exists("./data/{}_daily_{}.csv".format(symbol, current_date)):
-    prices = pd.read_csv("./data/{}_daily_{}.csv".format(symbol, current_date))
+if path.exists("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date)):
+    prices = pd.read_csv("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date))
     prices = prices.set_index("date", drop = True)
 else:
-    prices = fetch_daily(symbol, save_csv = True)
-
+    prices = fetch_daily_adjusted(symbol, save_csv = True)
+    prices_cols = prices.columns
+    for col in prices_cols[0:3]:
+        prices[col] = prices[col] * prices["5. adjusted close"]/prices["4. close"]
+    prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
 # Build dataset
-
+print("Contains data through {}".format(max(prices.index)))
 df = prices
 df.index.names = ['date']
 df = df.sort_index()
@@ -125,11 +128,12 @@ plt.legend(['Actual','Predicted'])
 plt.plot(dates2, y_test, label = 'actual')
 plt.plot(dates2, y_test_predicted, label = 'predicted')
 plt.legend(['Actual','Predicted'])
-
+print("")
+print("The test period covers {} between {} and {}".format(symbol, dates[0].date(), dates[-1].date()))
+print("")
 print("The actual change over the time period is {}".format(sum(y_test)))
 print("The predicted change over the time period is {}".format(sum(y_test_predicted)))
-
-plt.scatter(y_test_predicted, y_test)
+print("")
 
 correct_sign = np.zeros(len(y_test))
 for i in range(len(y_test)):
@@ -139,7 +143,33 @@ for i in range(len(y_test)):
         correct_sign[i] = 0
         
 print("The model selects the correct direction {:%} of the time".format(np.mean(correct_sign)))
+print("")
 
+pred_change = y_test_predicted[:-1]
+b1 = 100
+b05 = 100
+b02 = 100
+b01 = 100
+
+for i in range(len(actual_close)-1):
+    if pred_change[i+1] >= actual_close[i]*0.01:
+        b1 = b1*actual_close[i+1]/actual_close[i]
+    if pred_change[i+1] >= actual_close[i]*0.005:
+        b05 = b05*actual_close[i+1]/actual_close[i]
+    if pred_change[i+1] >= actual_close[i]*0.002:
+        b02 = b02*actual_close[i+1]/actual_close[i]
+    if pred_change[i+1] >= actual_close[i]*0.001:
+        b01 = b01*actual_close[i+1]/actual_close[i]
+        
+bhold = 100 * actual_close[-1]/actual_close[0]
+
+print("BUYING AND SELLING AFTER 1 DAY")        
+print("With a threshold of 1% you finished with {:%} of your starting amount".format(b1/100))
+print("With a threshold of 0.5% you finished with {:%} of your starting amount".format(b05/100))
+print("With a threshold of 0.2% you finished with {:%} of your starting amount".format(b02/100))
+print("With a threshold of 0.1% you finished with {:%} of your starting amount".format(b01/100))
+print("By buying and holding you finished with {:%} of your starting amount".format(bhold/100))
+print("")
 # Pickling isn't working right now. Found a potential workaround on stackoverflow
 # but i'm leaving it for now 
 # https://stackoverflow.com/questions/44855603/typeerror-cant-pickle-thread-lock-objects-in-seq2seq

@@ -11,18 +11,23 @@ current_date = date.today()
 sample_days = 50
 
 # Stock symbol to train the model with
-symbol = "GE"
+symbol = "NFLX"
 
 # Load technicals and price data
 # Write/read from csv to reduce API calls
 if path.exists("./data/{}_technicals_{}.csv".format(symbol, current_date)):
     technicals = pd.read_csv("./data/{}_technicals_{}.csv".format(symbol, current_date))
+    technicals = technicals.set_index("date", drop = True)
 else:
     technicals = fetch_technicals(symbol, interval = "daily", save_csv = True)
     time.sleep(60)
 if path.exists("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date)):
     prices = pd.read_csv("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date))
     prices = prices.set_index("date", drop = True)
+    prices_cols = prices.columns
+    for col in prices_cols[0:3]:
+        prices[col] = prices[col] * prices["5. adjusted close"]/prices["4. close"]
+    prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
 else:
     prices = fetch_daily_adjusted(symbol, save_csv = True)
     prices_cols = prices.columns
@@ -31,8 +36,12 @@ else:
     prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
 # Build dataset
 print("Contains data through {}".format(max(prices.index)))
-df = prices
+
+df = pd.merge(prices, technicals, left_index=True, right_index=True)
+#df = df.drop(['MACD','MACD_Signal','Real Middle Band', 'Real Lower Band', 
+#              'Real Upper Band'], axis=1)
 df.index.names = ['date']
+df = df.dropna()
 df = df.sort_index()
 
 input_data = df.to_numpy()
@@ -40,7 +49,8 @@ days_history = len(input_data)
 ncols = len(df.columns)
 
 # Build a target dataset of the change in price between closes
-close = input_data[:,3][:]
+#close = input_data[:,3][:]
+close = df['4. close'].to_numpy()
 close_change = np.ndarray(shape = (days_history-1,1), dtype = float)
 for i in range(days_history-1):
     close_change[i] = close[i+1]-close[i]
@@ -119,6 +129,7 @@ dates2 = df.index[-len(y_test_predicted):]
 
 actual_close = close[-len(y_test_predicted)+1:] + y_test[:-1][1]
 pred_close = close[-len(y_test_predicted)+1:] + y_test_predicted[:-1][1]
+actual_open = df['1. open'][-len(y_test_predicted):].to_numpy()
 
 import matplotlib.pyplot as plt
 plt.plot(dates, actual_close, label = 'actual')
@@ -129,7 +140,7 @@ plt.plot(dates2, y_test, label = 'actual')
 plt.plot(dates2, y_test_predicted, label = 'predicted')
 plt.legend(['Actual','Predicted'])
 print("")
-print("The test period covers {} between {} and {}".format(symbol, dates[0].date(), dates[-1].date()))
+print("The test period covers {} between {} and {}".format(symbol, dates[0], dates[-1]))
 print("")
 print("The actual change over the time period is {}".format(sum(y_test)))
 print("The predicted change over the time period is {}".format(sum(y_test_predicted)))
@@ -150,24 +161,41 @@ b1 = 100
 b05 = 100
 b02 = 100
 b01 = 100
+b0 = 100
 
+n1 = 0
+n05 = 0
+n02 = 0
+n01 = 0
+n0 = 0
+# Working on this. Need to convert the b calculation to close/open rather than 
+# close/prev close. Also add logic checking how far the open is from our pred
+# close
 for i in range(len(actual_close)-1):
-    if pred_change[i+1] >= actual_close[i]*0.01:
-        b1 = b1*actual_close[i+1]/actual_close[i]
-    if pred_change[i+1] >= actual_close[i]*0.005:
-        b05 = b05*actual_close[i+1]/actual_close[i]
-    if pred_change[i+1] >= actual_close[i]*0.002:
-        b02 = b02*actual_close[i+1]/actual_close[i]
-    if pred_change[i+1] >= actual_close[i]*0.001:
-        b01 = b01*actual_close[i+1]/actual_close[i]
+    if pred_change[i+1] >= actual_close[i]*0.01 and actual_open[i+1]-actual_close[i] <= pred_change[i+1]*0.5:
+        b1 = b1*actual_close[i+1]/actual_open[i+1]
+        n1 += 1
+    if pred_change[i+1] >= actual_close[i]*0.005 and actual_open[i+1]-actual_close[i] <= pred_change[i+1]*0.5:
+        b05 = b05*actual_close[i+1]/actual_open[i+1]
+        n05 += 1
+    if pred_change[i+1] >= actual_close[i]*0.002 and actual_open[i+1]-actual_close[i] <= pred_change[i+1]*0.5:
+        b02 = b02*actual_close[i+1]/actual_open[i+1]
+        n02 += 1
+    if pred_change[i+1] >= actual_close[i]*0.001 and actual_open[i+1]-actual_close[i] <= pred_change[i+1]*0.5:
+        b01 = b01*actual_close[i+1]/actual_open[i+1]
+        n01 += 1
+    if pred_change[i+1] >= 0 and actual_open[i+1]-actual_close[i] <= pred_change[i+1]*0.5:
+        b0 = b0*actual_close[i+1]/actual_open[i+1]
+        n0 += 1
         
 bhold = 100 * actual_close[-1]/actual_close[0]
 
 print("BUYING AND SELLING AFTER 1 DAY")        
-print("With a threshold of 1% you finished with {:%} of your starting amount".format(b1/100))
-print("With a threshold of 0.5% you finished with {:%} of your starting amount".format(b05/100))
-print("With a threshold of 0.2% you finished with {:%} of your starting amount".format(b02/100))
-print("With a threshold of 0.1% you finished with {:%} of your starting amount".format(b01/100))
+print("With a threshold of 1% you traded {} times and finished with {:%} of your starting amount".format(n1,b1/100))
+print("With a threshold of 0.5% you traded {} times and finished with {:%} of your starting amount".format(n05,b05/100))
+print("With a threshold of 0.2% you traded {} times and finished with {:%} of your starting amount".format(n02,b02/100))
+print("With a threshold of 0.1% you traded {} times and finished with {:%} of your starting amount".format(n01,b01/100))
+print("With a threshold of 0% you traded {} times and finished with {:%} of your starting amount".format(n0,b0/100))
 print("By buying and holding you finished with {:%} of your starting amount".format(bhold/100))
 print("")
 # Pickling isn't working right now. Found a potential workaround on stackoverflow

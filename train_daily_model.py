@@ -24,22 +24,26 @@ else:
 if path.exists("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date)):
     prices = pd.read_csv("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date))
     prices = prices.set_index("date", drop = True)
-    prices_cols = prices.columns
-    for col in prices_cols[0:4]:
-        prices[col] = prices[col] * prices["5. adjusted close"]/prices["4. close"]
-    prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
 else:
     prices = fetch_daily_adjusted(symbol, save_csv = True)
-    prices_cols = prices.columns
-    for col in prices_cols[0:4]:
-        prices[col] = prices[col] * prices["5. adjusted close"]/prices["4. close"]
-    prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
-# Build dataset
+    
 print("Contains data through {}".format(max(prices.index)))
 
+#Process columns
+prices_cols = prices.columns
+for col in prices_cols[0:4]:
+    prices[col] = prices[col] * prices["5. adjusted close"]/prices["4. close"]
+prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coefficient"], axis=1)
+
+technicals["bband_width"] = technicals["Real Upper Band"] - technicals["Real Lower Band"]
+technicals = technicals.drop(["Real Upper Band", "Real Middle Band", "Real Lower Band"], axis=1)
+
+# Build dataset
 df = pd.merge(prices, technicals, left_index=True, right_index=True)
 #df = df.drop(['MACD','MACD_Signal','Real Middle Band', 'Real Lower Band', 
 #              'Real Upper Band'], axis=1)
+
+
 df.index.names = ['date']
 df = df.dropna()
 df = df.sort_index()

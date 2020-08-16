@@ -11,10 +11,13 @@ from alpha_vantage.techindicators import TechIndicators
 from alpha_vantage.sectorperformance import SectorPerformances
 import pandas as pd
 from datetime import date
+import json
 
 def fetch_sector_performance(save_csv = False):
     current_date = date.today()
-    sp = SectorPerformances(key='MU7WOKE2G7L93MXA', output_format='pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    sp = SectorPerformances(key=av_key, output_format='pandas')
     data, meta_data = sp.get_sector()
     if save_csv == True:
         data.to_csv('./data/sector_performance_{}.csv'.format(current_date))
@@ -22,7 +25,9 @@ def fetch_sector_performance(save_csv = False):
 
 def fetch_daily(symbol, save_csv = False):
     # Should come up with a system to handle the KPI key    
-    ts = TimeSeries(key='MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TimeSeries(key=av_key, output_format = 'pandas')
     data, meta_data = ts.get_daily(symbol, outputsize = 'full')
     if save_csv == True:
         current_date = date.today()
@@ -30,7 +35,9 @@ def fetch_daily(symbol, save_csv = False):
     return data
 
 def fetch_daily_adjusted(symbol, save_csv = False):
-    ts = TimeSeries(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TimeSeries(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_daily_adjusted(symbol, outputsize = 'full')
     if save_csv == True:
         current_date = date.today()
@@ -38,7 +45,9 @@ def fetch_daily_adjusted(symbol, save_csv = False):
     return data
     
 def fetch_intraday(symbol, interval = '15min', save_csv = False):
-    ts = TimeSeries(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TimeSeries(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_intraday(symbol, interval = interval, outputsize = 'full')
     if save_csv == True:
         current_date = date.today()
@@ -47,7 +56,9 @@ def fetch_intraday(symbol, interval = '15min', save_csv = False):
 
 # SMA = Simple Moving Average
 def fetch_sma(symbol, interval = '15min', time_period = 50, series_type = 'close', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_sma(symbol, interval = interval, time_period = time_period, series_type = series_type)
     if save_csv == True:
         current_date = date.today()
@@ -56,7 +67,9 @@ def fetch_sma(symbol, interval = '15min', time_period = 50, series_type = 'close
 
 # EMA = Exponential Moving Average
 def fetch_ema(symbol, interval = '15min', time_period = 50, series_type = 'close', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_ema(symbol, interval = interval, time_period = time_period, series_type = series_type)
     if save_csv == True:
         current_date = date.today()
@@ -65,7 +78,9 @@ def fetch_ema(symbol, interval = '15min', time_period = 50, series_type = 'close
 
 # VWAP = Value Weighted Average Price
 def fetch_vwap(symbol, interval = '15min', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_vwap(symbol, interval = interval)
     if save_csv == True:
         current_date = date.today()
@@ -74,7 +89,9 @@ def fetch_vwap(symbol, interval = '15min', save_csv = False):
 
 # MACD = Moving Average Convergence/Divergence
 def fetch_macd(symbol, interval = '15min', series_type = 'close', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_macd(symbol, interval = interval, series_type = series_type)
     if save_csv == True:
         current_date = date.today()
@@ -83,7 +100,9 @@ def fetch_macd(symbol, interval = '15min', series_type = 'close', save_csv = Fal
 
 # STOCH = Stochastic Oscillator
 def fetch_stoch(symbol, interval = '15min', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_stoch(symbol, interval = interval)
     if save_csv == True:
         current_date = date.today()
@@ -92,7 +111,9 @@ def fetch_stoch(symbol, interval = '15min', save_csv = False):
 
 # RSI = Relative Strength Index
 def fetch_rsi(symbol, interval = '15min', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_rsi(symbol, interval = interval)
     if save_csv == True:
         current_date = date.today()
@@ -101,7 +122,9 @@ def fetch_rsi(symbol, interval = '15min', save_csv = False):
 
 # ADX = Average Directional Movement Index
 def fetch_adx(symbol, interval = '15min', time_period = 50, save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_adx(symbol, interval = interval, time_period = time_period)
     if save_csv == True:
         current_date = date.today()
@@ -110,7 +133,9 @@ def fetch_adx(symbol, interval = '15min', time_period = 50, save_csv = False):
 
 # CCI = Commodity Channel Index
 def fetch_cci(symbol, interval = '15min', time_period = 50, save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_cci(symbol, interval = interval, time_period = time_period)
     if save_csv == True:
         current_date = date.today()
@@ -119,7 +144,9 @@ def fetch_cci(symbol, interval = '15min', time_period = 50, save_csv = False):
 
 # AROON = Aroon Indicator
 def fetch_aroon(symbol, interval = '15min', time_period = 50, save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_aroon(symbol, interval = interval, time_period = time_period)
     if save_csv == True:
         current_date = date.today()
@@ -128,7 +155,9 @@ def fetch_aroon(symbol, interval = '15min', time_period = 50, save_csv = False):
 
 # BBANDS = Bollinger Bands
 def fetch_bbands(symbol, interval = '15min', time_period = 50, save_csv = False, series_type = 'close'):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_bbands(symbol, interval = interval, time_period = time_period, series_type = series_type)
     if save_csv == True:
         current_date = date.today()
@@ -137,7 +166,9 @@ def fetch_bbands(symbol, interval = '15min', time_period = 50, save_csv = False,
 
 # AD = Chaikin A/D Line
 def fetch_ad(symbol, interval = '15min', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_ad(symbol, interval = interval)
     if save_csv == True:
         current_date = date.today()
@@ -146,7 +177,9 @@ def fetch_ad(symbol, interval = '15min', save_csv = False):
 
 # OBV = On Balance Volume
 def fetch_obv(symbol, interval = '15min', save_csv = False):
-    ts = TechIndicators(key = 'MU7WOKE2G7L93MXA', output_format = 'pandas')
+    credentials = json.load(open('credentials.json','r'))
+    av_key = credentials['alpha_vantage']
+    ts = TechIndicators(key = av_key, output_format = 'pandas')
     data, meta_data = ts.get_obv(symbol, interval = interval)
     if save_csv == True:
         current_date = date.today()

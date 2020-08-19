@@ -1,10 +1,10 @@
 
-from fetch_functions import fetch_technicals, fetch_daily, fetch_intraday, fetch_daily_adjusted
+from fetch_functions import fetch_technicals, fetch_daily, fetch_intraday, fetch_daily_adjusted, fetch_earnings
 import pandas as pd
 import numpy as np
 import time
 from os import path
-from datetime import date
+from datetime import date, timedelta, datetime
 from sklearn import preprocessing
 
 current_date = date.today()
@@ -13,7 +13,7 @@ sample_days = 50
 # Stock symbol to train the model with
 symbol = "AMZN"
 
-# Load technicals and price data
+# Fetch technical data
 # Write/read from csv to reduce API calls
 if path.exists("./data/{}_technicals_{}.csv".format(symbol, current_date)):
     technicals = pd.read_csv("./data/{}_technicals_{}.csv".format(symbol, current_date))
@@ -21,11 +21,22 @@ if path.exists("./data/{}_technicals_{}.csv".format(symbol, current_date)):
 else:
     technicals = fetch_technicals(symbol, interval = "daily", save_csv = True)
     time.sleep(60)
+
+# Fetch daily price data
 if path.exists("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date)):
     prices = pd.read_csv("./data/{}_daily_adjusted_{}.csv".format(symbol, current_date))
+    prices['date'] = prices['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%d'))
     prices = prices.set_index("date", drop = True)
 else:
     prices = fetch_daily_adjusted(symbol, save_csv = True)
+    
+# Fetch earnings data
+if path.exists("./data/{}_earnings.csv".format(symbol)):
+    earnings = pd.read_csv("./data/{}_earnings.csv".format(symbol))
+    if datetime.strptime(max(earnings['refresh_date']), '%Y-%m-%d').date() < (current_date - timedelta(days=30)):
+        earnings = fetch_earnings(symbol, save_csv = True)
+else:
+    earnings = fetch_earnings(symbol, save_csv = True)
     
 print("Contains data through {}".format(max(prices.index)))
 
@@ -38,6 +49,9 @@ prices = prices.drop(["5. adjusted close", "7. dividend amount", "8. split coeff
 technicals["bband_width"] = technicals["Real Upper Band"] - technicals["Real Lower Band"]
 technicals = technicals.drop(["Real Upper Band", "Real Middle Band", "Real Lower Band"], axis=1)
 
+earnings_date_strings = earnings['startdatetime'].to_list()
+earnings_dates = [datetime.strptime(dt, '%Y-%m-%dT%H:%M:%S.000Z').date()  for dt in earnings_date_strings]
+
 # Build dataset
 df = pd.merge(prices, technicals, left_index=True, right_index=True)
 #df = df.drop(['MACD','MACD_Signal','Real Middle Band', 'Real Lower Band', 
@@ -48,9 +62,19 @@ df.index.names = ['date']
 df = df.dropna()
 df = df.sort_index()
 
+earnings_idx = []
+indices = df.index
+for i in range(len(indices)):
+    if indices[i] in earnings_dates:
+        earnings_idx.append(i)
+
 input_data = df.to_numpy()
+
 days_history = len(input_data)
 ncols = len(df.columns)
+
+input_data = np.delete(input_data, earnings_idx, axis=0)
+
 
 # Build a target dataset of the change in price between closes
 #close = input_data[:,3][:]
@@ -59,6 +83,9 @@ close_change = np.ndarray(shape = (days_history-1,1), dtype = float)
 for i in range(days_history-1):
     close_change[i] = close[i+1]-close[i]
 #close_change[days_history-1] = 0
+
+close = np.delete(close, earnings_idx, axis=0)
+close_change = np.delete(close_change, earnings_idx, axis=0)
 
 #Set the training/test split
 test_split = 0.9 
@@ -128,12 +155,15 @@ y_test_predicted = model.predict(X_test)
 y_test_predicted = scaler_target_test.inverse_transform(y_test_predicted)
 y_test = scaler_target_test.inverse_transform(y_test)
 
-dates = df.index[n+sample_days+1:]
-dates2 = df.index[n+sample_days:-1]
+dates_total =  [x for x in df.index.to_list() if x.date() not in earnings_dates]
+dates = dates_total[n+sample_days+1:]
+dates2 = dates_total[n+sample_days:-1]
 
 actual_close = close[n+sample_days:-1] + y_test[:-1][1]
 pred_close = close[n+sample_days:-1] + y_test_predicted[:-1][1]
-actual_open = df['1. open'][n+sample_days:-1].to_numpy()
+total_open = df['1. open'].to_numpy()
+total_open = np.delete(total_open, earnings_idx, axis=0)
+actual_open = total_open[n+sample_days:-1]
 
 import matplotlib.pyplot as plt
 plt.figure(0)

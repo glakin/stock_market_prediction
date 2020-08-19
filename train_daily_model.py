@@ -11,7 +11,7 @@ current_date = date.today()
 sample_days = 50
 
 # Stock symbol to train the model with
-symbol = "T"
+symbol = "AMZN"
 
 # Load technicals and price data
 # Write/read from csv to reduce API calls
@@ -174,25 +174,45 @@ n05 = 0
 n02 = 0
 n01 = 0
 n0 = 0
-# Working on this. Need to convert the b calculation to close/open rather than 
-# close/prev close. Also add logic checking how far the open is from our pred
-# close
+
+d1 = []
+d05 = []
+d02 = []
+d01 = []
+d0 = []
+
+c1 = []
+c05 = []
+c02 = []
+c01 = []
+c0 = []
+
 for i in range(len(actual_close)-1):
     if pred_change[i] >= actual_close[i]*0.01 and actual_open[i+1]-actual_close[i] <= pred_change[i]*0.5:
         b1 = b1*actual_close[i+1]/actual_open[i+1]
         n1 += 1
+        d1.append(dates2[i])
+        c1.append(actual_close[i])
     if pred_change[i] >= actual_close[i]*0.005 and actual_open[i+1]-actual_close[i] <= pred_change[i]*0.5:
         b05 = b05*actual_close[i+1]/actual_open[i+1]
         n05 += 1
+        d05.append(dates2[i])
+        c05.append(actual_close[i])
     if pred_change[i] >= actual_close[i]*0.002 and actual_open[i+1]-actual_close[i] <= pred_change[i]*0.5:
         b02 = b02*actual_close[i+1]/actual_open[i+1]
         n02 += 1
+        d02.append(dates2[i])
+        c02.append(actual_close[i])
     if pred_change[i] >= actual_close[i]*0.001 and actual_open[i+1]-actual_close[i] <= pred_change[i]*0.5:
         b01 = b01*actual_close[i+1]/actual_open[i+1]
         n01 += 1
+        d01.append(dates2[i])
+        c01.append(actual_close[i])
     if pred_change[i] >= 0 and actual_open[i+1]-actual_close[i] <= pred_change[i]*0.5:
         b0 = b0*actual_close[i+1]/actual_open[i+1]
         n0 += 1
+        d0.append(dates2[i])
+        c0.append(actual_close[i])
         
 bhold = 100 * actual_close[-1]/actual_close[0]
 
@@ -204,6 +224,11 @@ print("With a threshold of 0.1% you traded {} times and finished with {:%} of yo
 print("With a threshold of 0% you traded {} times and finished with {:%} of your starting amount".format(n0,b0/100))
 print("By buying and holding you finished with {:%} of your starting amount".format(bhold/100))
 print("")
+
+# Plot the trades
+
+plt.plot(dates, actual_close)
+plt.scatter(d0, c0, s=1.5, c="red")
 # Pickling isn't working right now. Found a potential workaround on stackoverflow
 # but i'm leaving it for now 
 # https://stackoverflow.com/questions/44855603/typeerror-cant-pickle-thread-lock-objects-in-seq2seq

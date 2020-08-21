@@ -10,6 +10,7 @@ from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.techindicators import TechIndicators
 from alpha_vantage.sectorperformance import SectorPerformances
 import pandas as pd
+import time
 from datetime import date
 import json
 
@@ -189,6 +190,7 @@ def fetch_obv(symbol, interval = '15min', save_csv = False):
 # A function to pull multiple technical indicators
 def fetch_technicals(symbol, save_csv = False, interval = '15min', time_period = 50, series_type = 'close'):
     from functools import reduce
+
     df1 = fetch_sma(symbol, save_csv = False, interval = interval, time_period = time_period, series_type = series_type)
     df2 = fetch_adx(symbol, save_csv = False, interval = interval, time_period = time_period)
     df3 = fetch_macd(symbol, save_csv = False, interval = interval, series_type = series_type)
@@ -200,4 +202,42 @@ def fetch_technicals(symbol, save_csv = False, interval = '15min', time_period =
     if save_csv == True:
         current_date = date.today()
         technicals.to_csv('./data/{}_technicals_{}.csv'.format(symbol, current_date))
+    return technicals
+
+def fetch_earnings(symbol, save_csv = False):
+    from yahoo_earnings_calendar import YahooEarningsCalendar
+    yec = YahooEarningsCalendar()
+    df = pd.DataFrame(yec.get_earnings_of(symbol))
+    df = df.rename(columns = {'ticker':'symbol'})
+    
+    if save_csv == True:
+        path = './data/{}_earnings.csv'.format(symbol)
+        df.to_csv(path)
+    return df
+
+def fetch_daily_technicals(symbol, save_csv = False, series_type = 'close'):
+    from functools import reduce
+
+    sma25 = fetch_sma(symbol, interval = 'daily', time_period = 25, series_type = series_type)
+    sma50 = fetch_sma(symbol, interval = 'daily', time_period = 50, series_type = series_type)
+    ema25 = fetch_ema(symbol, interval = 'daily', time_period = 25, series_type = series_type)
+    ema50 = fetch_ema(symbol, interval = 'daily', time_period = 50, series_type = series_type)
+    rsi = fetch_rsi(symbol, interval = 'daily')
+    time.sleep(60)
+    stoch = fetch_stoch(symbol, interval = 'daily')
+    adx15 = fetch_adx(symbol, interval = 'daily', time_period = 15)
+    macd = fetch_macd(symbol, interval = 'daily', series_type = series_type)
+    bbands25 = fetch_bbands(symbol, interval = 'daily', time_period = 25, series_type = series_type)
+    aroon25 = fetch_aroon(symbol, interval = 'daily', time_period = 25)
+    time.sleep(60)
+    cci25 = fetch_cci(symbol, interval = 'daily', time_period = 25)
+    ad = fetch_ad(symbol, interval = 'daily')
+    obv = fetch_obv(symbol, interval = 'daily')
+    
+    df_list = [sma25, sma50, ema25, ema50, rsi, stoch, adx15, macd, bbands25, aroon25, cci25, ad, obv]
+    technicals = reduce(lambda  left,right: pd.merge(left,right,on=['date'], how='outer'), df_list)
+    if save_csv == True:
+        current_date = date.today()
+        technicals.to_csv('./data/{}_daily_technicals_{}.csv'.format(symbol, current_date))
+    technicals = technicals.reset_index()
     return technicals

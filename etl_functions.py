@@ -3,6 +3,7 @@ import keyring as k
 import time
 from fetch_functions import fetch_daily_adjusted, fetch_earnings, fetch_daily_technicals
 from sqlalchemy import create_engine
+from datetime import datetime
 
 def update_daily_prices(symbols):
     
@@ -65,13 +66,13 @@ def update_earnings(symbols):
     del(engine_string)
     
     cols = ['symbol', 
-            'companyshortname', 
-            'startdatetime', 
+            'company', 
+            'date', 
             'startdatetimetype',
             'epsestimate',
             'epsactual', 
             'epssurprisepct', 
-            'timeZoneShortName',
+            'time_zone',
             'gmtOffsetMilliSeconds', 
             'quoteType']
     
@@ -87,7 +88,9 @@ def update_earnings(symbols):
             except:
                 print('Error getting earnings data for {}'.format(symbol))
                 continue
-        df['symbol']= symbol
+        
+        df.columns = cols
+        df['date'] = df['date'].apply(lambda x: datetime.strptime(x, '%Y-%m-%dT%H:%M:%S.000Z').date())
         earnings = earnings.append(df)
     
     table = "earnings"
@@ -164,3 +167,17 @@ def update_daily_technicals(symbols):
     table = "technicals_daily"
     
     technicals.to_sql(table, con = engine, if_exists='replace')
+    
+def execute_query(query):
+    
+    host = 'localhost'
+    database = 'stocks'
+    
+    engine_string = 'mysql+pymysql://{}:{}@{}/{}'.format(k.get_password("mysql","username"), k.get_password("mysql","password"), host, database)
+    engine = create_engine(engine_string)
+    del(engine_string)
+    
+    df = pd.read_sql(query, con=engine)
+    
+    return df
+    

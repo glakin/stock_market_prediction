@@ -41,10 +41,12 @@ def update_daily_prices(symbols):
             df = fetch_daily_adjusted(symbol)
         except:
             time.sleep(60)
-            df = fetch_daily_adjusted(symbol)
-        df = df.reset_index()
-        
-      
+            try:
+                df = fetch_daily_adjusted(symbol)
+            except:
+                print('Error getting daily price data for {}'.format(symbol))
+                continue
+        df = df.reset_index()      
         df.columns = dcols        
         df['symbol']= symbol
         prices = prices.append(df)
@@ -80,7 +82,11 @@ def update_earnings(symbols):
             df = fetch_earnings(symbol)
         except:
             time.sleep(60)
-            df = fetch_earnings(symbol)     
+            try:
+                df = fetch_earnings(symbol)                  
+            except:
+                print('Error getting earnings data for {}'.format(symbol))
+                continue
         df['symbol']= symbol
         earnings = earnings.append(df)
     
@@ -147,11 +153,14 @@ def update_daily_technicals(symbols):
             df = fetch_daily_technicals(symbol)
         except:
             time.sleep(60)
-            df = fetch_daily_technicals(symbol)     
+            try:
+                df = fetch_daily_technicals(symbol)                  
+            except:
+                print('Error getting technical data for {}'.format(symbol))
+                continue    
         df.columns = dcols
         df['symbol']= symbol
         technicals = technicals.append(df)
-        
     table = "technicals_daily"
     
     technicals.to_sql(table, con = engine, if_exists='replace')

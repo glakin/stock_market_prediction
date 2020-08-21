@@ -11,7 +11,7 @@ current_date = date.today()
 sample_days = 50
 
 # Stock symbol to train the model with
-symbol = "AMZN"
+symbol = "NFLX"
 
 # Fetch technical data
 # Write/read from csv to reduce API calls
@@ -152,18 +152,19 @@ print(evaluation)
 
 y_test_predicted = model.predict(X_test)
 
-y_test_predicted = scaler_target_test.inverse_transform(y_test_predicted)
-y_test = scaler_target_test.inverse_transform(y_test)
+change_test_predicted = scaler_target_test.inverse_transform(y_test_predicted)
+change_test = scaler_target_test.inverse_transform(y_test)
 
 dates_total =  [x for x in df.index.to_list() if x.date() not in earnings_dates]
 dates = dates_total[n+sample_days+1:]
 dates2 = dates_total[n+sample_days:-1]
 
-actual_close = close[n+sample_days:-1] + y_test[:-1][1]
-pred_close = close[n+sample_days:-1] + y_test_predicted[:-1][1]
+#actual_close = close[n+sample_days:-1] + change_test[:-1][1]
+actual_close = close[n+sample_days+1:]
+pred_close = close[n+sample_days:-1] + change_test_predicted[:-1][1]
 total_open = df['1. open'].to_numpy()
 total_open = np.delete(total_open, earnings_idx, axis=0)
-actual_open = total_open[n+sample_days:-1]
+actual_open = total_open[n+sample_days+1:]
 
 import matplotlib.pyplot as plt
 plt.figure(0)
@@ -193,6 +194,8 @@ print("The model selects the correct direction {:%} of the time".format(np.mean(
 print("")
 
 pred_change = y_test_predicted[:]
+
+b = 100
 b1 = 100
 b05 = 100
 b02 = 100
@@ -243,6 +246,8 @@ for i in range(len(actual_close)-1):
         n0 += 1
         d0.append(dates2[i])
         c0.append(actual_close[i])
+    b = b*actual_close[i+1]/actual_open[i+1]
+    
         
 bhold = 100 * actual_close[-1]/actual_close[0]
 
@@ -256,7 +261,7 @@ print("By buying and holding you finished with {:%} of your starting amount".for
 print("")
 
 # Plot the trades
-
+plt.figure(2)
 plt.plot(dates, actual_close)
 plt.scatter(d0, c0, s=1.5, c="red")
 # Pickling isn't working right now. Found a potential workaround on stackoverflow

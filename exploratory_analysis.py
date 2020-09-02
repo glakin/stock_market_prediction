@@ -1,62 +1,83 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Aug  2 10:38:11 2020
-
-@author: Jerry
-"""
-
-from fetch_functions import fetch_daily, fetch_intraday, fetch_technicals
-import matplotlib.pyplot as plt
-import numpy as np
+from etl_functions import execute_query 
 import pandas as pd
+import numpy as np
+import seaborn as sns
+from matplotlib import pyplot as plt
 
-# Use fetch functions to pull daily and intraday data for each symbol
-amzn_daily = fetch_daily("AMZN")
-googl_daily = fetch_daily("GOOGL")
-pton_daily = fetch_daily("PTON")
-ko_daily = fetch_daily("KO")
+symbol = 'KO'
 
-amzn_intraday = fetch_intraday("AMZN")
-googl_intraday = fetch_intraday("GOOGL")
-pton_intraday = fetch_intraday("PTON")
-ko_intraday = fetch_intraday("KO")
+query = '''
+    select p.date,
+           p.symbol,
+           p.open * p.adjusted_close/nullif(p.close,0) adjusted_open,
+           p.high * p.adjusted_close/nullif(p.close,0) adjusted_high,
+           p.low * p.adjusted_close/nullif(p.close,0) adjusted_low,
+           p.adjusted_close,
+           p.volume,
+           t.sma_25,
+           t.sma_50,
+           t.ema_25,
+           t.ema_50,
+           t.rsi,
+           t.slowK,
+           t.slowD,
+           t.adx,
+           t.macd_hist,
+           t.macd,
+           t.macd_signal,
+           t.real_upper_band - t.real_lower_band bband_width,
+           t.aroon_up - t.aroon_down net_aroon,
+           t.cci,
+           t.chaikin_ad,
+           t.obv
+           
+    from prices_daily p
+    join technicals_daily t on p.symbol = t.symbol and p.date = t.date
+    left join earnings e on p.symbol = e.symbol and p.date = e.date
+    where e.date is null
+    and p.symbol = '{}'
+    order by p.symbol, p.date asc        
+    '''.format(symbol)
+    
+cc_query = '''
+   	select p.date,
+           p.symbol,
+   		   (p2.adjusted_close - p.adjusted_close)/p.adjusted_close close_change_pct               
+   	from (select symbol, date, adjusted_close, row_number() over (partition by symbol order by date asc) rownum from prices_daily) p
+   	join (select symbol, date, adjusted_close, row_number() over (partition by symbol order by date asc) rownum from prices_daily) p2 on p.symbol = p2.symbol and p2.rownum = p.rownum+1
+   	left join earnings e on p.symbol = e.symbol and p.date = e.date
+   	where e.date is null
+    and p.symbol = '{}'
+   	order by p.symbol, p.date asc      
+    '''.format(symbol)
 
-ko_intraday_1min = fetch_intraday("KO",interval="1min")
+features = execute_query(query)
+#features = features.set_index('date')
+features = features.dropna()
+#features = features.sort_index()
+features = features.drop(features.tail(1).index)
 
-# Plot daily price and volume charts for each symbol
-amzn_daily['4. close'].plot()
-amzn_daily['5. volume'].plot()
+min_date = min(features.date)
 
-googl_daily['4. close'].plot()
-googl_daily['5. volume'].plot()
+close_change = execute_query(cc_query)
+#close_change = close_change.set_index('date')
+#close_change.sort_index()   
+close_change = close_change[close_change.date >= min_date]
 
-pton_daily['4. close'].plot()
-pton_daily['5. volume'].plot()
+df = pd.merge(features, close_change, on = ['symbol','date'])
 
-ko_daily['4. close'].plot()
-ko_daily['5. volume'].plot()
+df['up_down'] = np.where(df['close_change_pct'] > 0, 'up', 'down')
+df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25']
+df['close_ema25_delta'] = df['adjusted_close'] - df['ema_25']
 
-# Plot intraday charts
-amzn_intraday['4. close'].plot()
-googl_intraday['4. close'].plot()
-pton_intraday['4. close'].plot()
-ko_intraday['4. close'].plot()
+feature = 'net_aroon'
 
-# Plot Coca Cola intraday on a 1 minute interval
-ko_intraday_1min['4. close'].plot()
-ko_intraday_1min['5. volume'].plot()
+plt.figure()
+sns.distplot(df[feature])
 
-# Some thoughts: volume tends to be high on day of IPO (see Peloton chart) so
-# it probably makes sense to remove the first element from that dataset
-# We should also try to account for earnings calls which can lead to big swings
-# (e.g. Coca Cola had earnings on Jul 20 and opened ~2 pts up the next day)
+plt.figure()
+sns.jointplot(x = feature, y = 'close_change_pct', data = df, kind = "hex")
 
-googl_technicals = fetch_technicals('GOOGL', interval='daily')
-googl_technicals['SMA'].plot()
-googl_technicals['MACD'].plot()
-googl_technicals['RSI'].plot()
+plt.figure()
+sns.violinplot(x = "up_down", y = feature, data = df)
 
-# Run bollinger bands on the same graph
-googl_technicals['Real Middle Band'].plot()
-googl_technicals['Real Lower Band'].plot()
-googl_technicals['Real Upper Band'].plot()

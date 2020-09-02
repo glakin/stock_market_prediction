@@ -16,6 +16,7 @@ def train_model(symbol, analyze = True):
     from keras.layers import Dense, Dropout, LSTM, Input, Activation, concatenate
     from keras import optimizers
     
+    
     sample_days = 50
     
     query = '''
@@ -97,10 +98,22 @@ def train_model(symbol, analyze = True):
     scaler_y_test = preprocessing.StandardScaler()
     
     # Normalize the data
-    X_train_input_norm = scaler_X_train.fit_transform(X_train_input)
+    scaler_X_train.fit(X_train_input)
+    X_train_input_norm = scaler_X_train.transform(X_train_input)
+    
+    # Use scaler for X_test
     X_test_input_norm = scaler_X_test.fit_transform(X_test_input)
-    y_train_input_norm = scaler_y_train.fit_transform(y_train_input)
-    y_test_input_norm = scaler_y_test.fit_transform(y_test_input)
+    
+    # Use X_train scaler
+    #X_test_input_norm = scaler_X_train.transform(X_test_input)
+    
+    # Scaled y
+    #y_train_input_norm = scaler_y_train.fit_transform(y_train_input)
+    #y_test_input_norm = scaler_y_test.fit_transform(y_test_input)
+    
+    # Unscaled y
+    y_train_input_norm = y_train_input
+    y_test_input_norm = y_test_input
     
     # NOTE: the more I think about it the more I think that we should probably
     # wait to normalize until after the following step, where the X and y data
@@ -114,6 +127,7 @@ def train_model(symbol, analyze = True):
     # Split the input and target data into groupings of size sample_days
     X_train = np.array([X_train_input_norm[i:i + sample_days].copy() for i in range(len(X_train_input_norm) - sample_days)])
     X_test = np.array([X_test_input_norm[i:i + sample_days].copy() for i in range(len(X_test_input_norm) - sample_days)])
+
     y_train = np.array([y_train_input_norm[i + sample_days].copy() for i in range(len(y_train_input_norm) - sample_days)])
     y_test = np.array([y_test_input_norm[i + sample_days].copy() for i in range(len(y_test_input_norm) - sample_days)])
     
@@ -143,33 +157,39 @@ def train_model(symbol, analyze = True):
     #from keras.utils import plot_model
     #plot_model(model, to_file = 'model.png')
     
-    model.fit(x = X_train, y = y_train, batch_size = 32, epochs = 50, 
-              shuffle = True, validation_split = 0.1, verbose = 0)
-    test_loss = model.evaluate(X_test, y_test)
+    model.fit(x = X_train, y = y_train, batch_size = 32, epochs = 100, 
+              shuffle = True, validation_split = 0.1, verbose = 1)
+    test_loss = model.evaluate(X_test, y_test, verbose=0)
+    train_loss = model.evaluate(X_train, y_train, verbose=0)
     
     if analyze == True:                
         import matplotlib.pyplot as plt
         import os
         import json
+        import seaborn as sns
         
         if not os.path.exists("./analysis/{}/".format(symbol)):
             p = "./analysis/{}/".format(symbol)
             os.mkdir(p)
-        else:
-            print('path exists')
         
         y_test_predicted = model.predict(X_test)
-        change_test_predicted = pd.Series(data = scaler_y_test.inverse_transform(y_test_predicted)[:,0], 
+        # change_test_predicted = pd.Series(data = scaler_y_test.inverse_transform(y_test_predicted)[:,0], 
+        #                                   index = dates_test, 
+        #                                   name = 'close_change')
+        # change_test = pd.Series(data = scaler_y_test.inverse_transform(y_test)[:,0], 
+        #                         index = dates_test, 
+        #                         name = 'close_change')
+        change_test_predicted = pd.Series(data = y_test_predicted[:,0], 
                                           index = dates_test, 
                                           name = 'close_change')
-        change_test = pd.Series(data = scaler_y_test.inverse_transform(y_test)[:,0], 
+        change_test = pd.Series(data = y_test[:,0], 
                                 index = dates_test, 
                                 name = 'close_change')
-        # close_test_predicted = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days:-1] + change_test_predicted.to_list()[:-1], 
-        #                        index = dates_test[:-1],
-        #                        name = 'predicted_close')
-        close_test = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days+1:], 
-                                 index = dates_test[:-1],
+        close_test_predicted = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days:-1] + change_test_predicted.to_list()[:-1], 
+                               index = dates_test[:-1],
+                               name = 'predicted_close')
+        close_test = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days:], 
+                                 index = dates_test[:],
                                  name = 'actual_close')
 
         #plt.figure(0)
@@ -178,11 +198,31 @@ def train_model(symbol, analyze = True):
         #plt.legend(['Actual', 'Predicted'])
         #plt.savefig()
         
-        plt.figure(1)
+        plt.figure()
         change_test.plot()
         change_test_predicted.plot()
         plt.legend(['Actual', 'Predicted'])
         plt.savefig('./analysis/{}/predicted_change.png'.format(symbol))
+        plt.close()
+        
+        fig1 = plt.figure()
+        ax1 = sns.scatterplot(x = change_test, y = change_test_predicted)
+        ax1.set_ylabel('Predicted Close Change')
+        ax1.set_xlabel('Actual Close Change')
+        plt.savefig('./analysis/{}/predicted_vs_actual_scatter.png'.format(symbol))
+        plt.close()        
+        
+        error = change_test - change_test_predicted
+        fig2 = plt.figure()
+        ax2 = sns.distplot(error)
+        ax2.set_xlabel('Close Change Error')
+        ax2.set_ylabel('Probability Distribution')
+        plt.savefig('./analysis/{}/predicted_vs_actual_scatter.png'.format(symbol))
+        plt.close()
+        
+        from sklearn.metrics import mean_absolute_error,mean_squared_error
+        mae = mean_absolute_error(change_test, change_test_predicted)
+        mse = mean_squared_error(change_test, change_test_predicted)
         
         correct_sign = np.zeros(len(change_test))
         for i in range(len(change_test)):
@@ -220,7 +260,7 @@ def train_model(symbol, analyze = True):
         c01 = []
         c0 = []
         
-        for i in range(len(close_test)-1):
+        for i in range(len(close_test)-2):
             if change_test_predicted[i] >= close_test[i]*0.01 and open_test[i+1]-close_test[i] <= change_test_predicted[i]*0.5:
                 b1 = b1*close_test[i+1]/open_test[i+1]
                 n1 += 1
@@ -248,36 +288,44 @@ def train_model(symbol, analyze = True):
                 c0.append(close_test[i])
             b = b*close_test[i+1]/open_test[i+1]            
                 
-        bhold = 100 * close_test[-1]/close_test[0]
+        bhold = close_test[-1]/close_test[0]
         
         # Plot the trades
-        plt.figure(2)
+        plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0%')
         plt.scatter(d0, c0, s=2, c="red")
         plt.savefig('./analysis/{}/trades_threshold_0%.png'.format(symbol))
+        plt.close()
 
-        plt.figure(3)
+        plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.1%')
         plt.scatter(d01, c01, s=2, c="red")
         plt.savefig('./analysis/{}/trades_threshold_0.1%.png'.format(symbol))
+        plt.close()
         
-        plt.figure(4)
+        plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.2%')
         plt.scatter(d02, c02, s=2, c="red")
         plt.savefig('./analysis/{}/trades_threshold_0.2%.png'.format(symbol))
+        plt.close()
              
-        plt.figure(5)
+        plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.5%')
         plt.scatter(d05, c05, s=2, c="red")
         plt.savefig('./analysis/{}/trades_threshold_0.5%.png'.format(symbol))    
+        plt.close()    
     
-        plt.figure(6)
+        plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 1%')
         plt.scatter(d1, c1, s=2, c="red")
         plt.savefig('./analysis/{}/trades_threshold_1%.png'.format(symbol))
+        plt.close()    
     
         analyze_dict = {
             "test_loss": test_loss,
+            "train_loss": train_loss,
+            "mean_absolute_error": mae,
+            "mean_squared_error": mse,
             "correct_sign_pct": correct_sign_pct,
             "return_buy_hold": bhold,
             "return_threshold_0_pct": b0,
@@ -294,6 +342,9 @@ def train_model(symbol, analyze = True):
         
         with open('./analysis/{}/{}_analysis.txt'.format(symbol, symbol), 'w') as outfile:
             json.dump(analyze_dict, outfile)      
+    
+    # model.save('{}_daily_model.h5'.format(symbol))
+    
     
     return model
         

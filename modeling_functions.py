@@ -16,7 +16,6 @@ def train_model(symbol, analyze = True):
     from keras.layers import Dense, Dropout, LSTM, Input, Activation, concatenate
     from keras import optimizers
     
-    
     sample_days = 50
     
     query = '''
@@ -26,10 +25,6 @@ def train_model(symbol, analyze = True):
                p.low * p.adjusted_close/nullif(p.close,0) adjusted_low,
                p.adjusted_close,
                p.volume,
-               t.sma_25,
-               t.sma_50,
-               t.ema_25,
-               t.ema_50,
                t.rsi,
                t.slowK,
                t.slowD,
@@ -64,6 +59,15 @@ def train_model(symbol, analyze = True):
     
     df = execute_query(query)
     df = df.set_index('date')
+    
+    # Calculate some features    
+    df['sma_25'] = df['adjusted_close'].rolling(25).mean()
+    df['sma_50'] = df['adjusted_close'].rolling(50).mean()
+    df['sma_25_slope_5_day'] = df['sma_25'].diff()/5
+    df['sma_50_slope_5_day'] = df['sma_50'].diff()/5
+    df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25']
+    df['close_sma50_delta'] = df['adjusted_close'] - df['sma_50']
+    
     df = df.dropna()
     df = df.sort_index()
     df = df.drop(df.tail(1).index)
@@ -102,10 +106,10 @@ def train_model(symbol, analyze = True):
     X_train_input_norm = scaler_X_train.transform(X_train_input)
     
     # Use scaler for X_test
-    X_test_input_norm = scaler_X_test.fit_transform(X_test_input)
+    #X_test_input_norm = scaler_X_test.fit_transform(X_test_input)
     
     # Use X_train scaler
-    #X_test_input_norm = scaler_X_train.transform(X_test_input)
+    X_test_input_norm = scaler_X_train.transform(X_test_input)
     
     # Scaled y
     #y_train_input_norm = scaler_y_train.fit_transform(y_train_input)
@@ -157,8 +161,8 @@ def train_model(symbol, analyze = True):
     #from keras.utils import plot_model
     #plot_model(model, to_file = 'model.png')
     
-    model.fit(x = X_train, y = y_train, batch_size = 32, epochs = 100, 
-              shuffle = True, validation_split = 0.1, verbose = 1)
+    model.fit(x = X_train, y = y_train, batch_size = 32, epochs = 50, 
+              shuffle = True, validation_split = 0.1, verbose = 0)
     test_loss = model.evaluate(X_test, y_test, verbose=0)
     train_loss = model.evaluate(X_train, y_train, verbose=0)
     
@@ -167,10 +171,14 @@ def train_model(symbol, analyze = True):
         import os
         import json
         import seaborn as sns
+        from datetime import date
         
-        if not os.path.exists("./analysis/{}/".format(symbol)):
-            p = "./analysis/{}/".format(symbol)
-            os.mkdir(p)
+        current_date = date.today()
+        path = "./analysis/{}/{}".format(symbol, current_date)
+        
+        if not os.path.exists(path):
+            #p = "./analysis/{}/".format(symbol)
+            os.mkdir(path)
         
         y_test_predicted = model.predict(X_test)
         # change_test_predicted = pd.Series(data = scaler_y_test.inverse_transform(y_test_predicted)[:,0], 
@@ -185,7 +193,7 @@ def train_model(symbol, analyze = True):
         change_test = pd.Series(data = y_test[:,0], 
                                 index = dates_test, 
                                 name = 'close_change')
-        close_test_predicted = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days:-1] + change_test_predicted.to_list()[:-1], 
+        close_test_predicted = pd.Series(data = df.adjusted_close.values[n+sample_days:-1] + change_test_predicted.values[:-1], 
                                index = dates_test[:-1],
                                name = 'predicted_close')
         close_test = pd.Series(data = df.adjusted_close.to_numpy()[n+sample_days:], 
@@ -202,22 +210,22 @@ def train_model(symbol, analyze = True):
         change_test.plot()
         change_test_predicted.plot()
         plt.legend(['Actual', 'Predicted'])
-        plt.savefig('./analysis/{}/predicted_change.png'.format(symbol))
+        plt.savefig('{}/predicted_change.png'.format(path))
         plt.close()
         
-        fig1 = plt.figure()
+        plt.figure()
         ax1 = sns.scatterplot(x = change_test, y = change_test_predicted)
         ax1.set_ylabel('Predicted Close Change')
         ax1.set_xlabel('Actual Close Change')
-        plt.savefig('./analysis/{}/predicted_vs_actual_scatter.png'.format(symbol))
+        plt.savefig('{}/predicted_vs_actual_scatter.png'.format(path))
         plt.close()        
         
         error = change_test - change_test_predicted
-        fig2 = plt.figure()
+        plt.figure()
         ax2 = sns.distplot(error)
         ax2.set_xlabel('Close Change Error')
         ax2.set_ylabel('Probability Distribution')
-        plt.savefig('./analysis/{}/predicted_vs_actual_scatter.png'.format(symbol))
+        plt.savefig('{}/error_distribution.png'.format(path))
         plt.close()
         
         from sklearn.metrics import mean_absolute_error,mean_squared_error
@@ -294,38 +302,38 @@ def train_model(symbol, analyze = True):
         plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0%')
         plt.scatter(d0, c0, s=2, c="red")
-        plt.savefig('./analysis/{}/trades_threshold_0%.png'.format(symbol))
+        plt.savefig('{}/trades_threshold_0%.png'.format(path))
         plt.close()
 
         plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.1%')
         plt.scatter(d01, c01, s=2, c="red")
-        plt.savefig('./analysis/{}/trades_threshold_0.1%.png'.format(symbol))
+        plt.savefig('{}/trades_threshold_0.1%.png'.format(path))
         plt.close()
         
         plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.2%')
         plt.scatter(d02, c02, s=2, c="red")
-        plt.savefig('./analysis/{}/trades_threshold_0.2%.png'.format(symbol))
+        plt.savefig('{}/trades_threshold_0.2%.png'.format(path))
         plt.close()
              
         plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 0.5%')
         plt.scatter(d05, c05, s=2, c="red")
-        plt.savefig('./analysis/{}/trades_threshold_0.5%.png'.format(symbol))    
+        plt.savefig('{}/trades_threshold_0.5%.png'.format(path))    
         plt.close()    
     
         plt.figure()
         close_test.plot(title = 'Timing of Trades using Threshold of 1%')
         plt.scatter(d1, c1, s=2, c="red")
-        plt.savefig('./analysis/{}/trades_threshold_1%.png'.format(symbol))
+        plt.savefig('{}/trades_threshold_1%.png'.format(path))
         plt.close()    
     
         analyze_dict = {
+            "sample_days": sample_days,
             "test_loss": test_loss,
             "train_loss": train_loss,
             "mean_absolute_error": mae,
-            "mean_squared_error": mse,
             "correct_sign_pct": correct_sign_pct,
             "return_buy_hold": bhold,
             "return_threshold_0_pct": b0,
@@ -340,7 +348,7 @@ def train_model(symbol, analyze = True):
             "trades_1_pct": n1            
             }
         
-        with open('./analysis/{}/{}_analysis.txt'.format(symbol, symbol), 'w') as outfile:
+        with open('{}/{}_analysis.txt'.format(path, symbol), 'w') as outfile:
             json.dump(analyze_dict, outfile)      
     
     # model.save('{}_daily_model.h5'.format(symbol))

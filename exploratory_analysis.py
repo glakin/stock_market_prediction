@@ -79,20 +79,23 @@ close_change = close_change[close_change.date >= min_date]
 
 df = pd.merge(features, close_change, on = ['symbol','date'])
 
+df['sma_25_corrected'] = df['adjusted_close'].rolling(25).mean()
+df['sma_50_corrected'] = df['adjusted_close'].rolling(50).mean()
+
 # Define whether the stock went up or down 
 df['up_down_1_day'] = np.where(df['close_change_pct_1_day'] > 0, 'up', 'down')
 df['up_down_5_day'] = np.where(df['close_change_pct_5_day'] > 0, 'up', 'down')
 
-df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25']
+df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25_corrected']
 df['close_ema25_delta'] = df['adjusted_close'] - df['ema_25']
-df['sma_25_slope_1_day'] = df['sma_25'].diff()
-df['sma_25_slope_5_day'] = df['sma_25'].diff()/5
+df['sma_25_slope_1_day'] = df['sma_25_corrected'].diff()
+df['sma_25_slope_5_day'] = df['sma_25_corrected'].diff()/5
 df['sma_25_slope_direction_5_day'] = np.where(df['sma_25_slope_5_day'] > 0, 'up', 'down')
 
 df.pivot_table(values = 'date',index = 'up_down_5_day', columns = 'sma_25_slope_direction_5_day', aggfunc = 'count')
 
-feature = 'sma_25_slope_5_day'
-feature2 = 'sma_25'
+feature = 'close_sma25_delta'
+feature2 = 'chaikin_ad'
 
 plt.figure()
 sns.distplot(df[feature])
@@ -101,7 +104,7 @@ plt.figure()
 sns.violinplot(x = 'sma_25_slope_direction_5_day', y = 'close_change_pct_5_day', data = df)
 
 plt.figure()
-sns.jointplot(x = feature, y = 'close_change_pct_5_day', data = df, kind = "reg")
+sns.jointplot(x = feature, y = 'close_change_1_day', data = df, kind = "reg")
 
 plt.figure()
 sns.jointplot(x = feature2, y = 'close_change_pct_5_day', data = df, kind = "reg")

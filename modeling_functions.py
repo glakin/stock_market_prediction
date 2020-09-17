@@ -4,7 +4,7 @@ Created on Fri Aug 21 16:44:34 2020
 
 @author: Jerry
 """
-def train_model(symbol, analyze = True):
+def train_model(symbol, offset_days = 1, analyze = True):
     from etl_functions import execute_query 
     from fetch_functions import fetch_earnings
     import pandas as pd
@@ -50,12 +50,12 @@ def train_model(symbol, analyze = True):
        	select p.date,
        		   p2.adjusted_close - p.adjusted_close close_change               
        	from (select symbol, date, adjusted_close, row_number() over (partition by symbol order by date asc) rownum from prices_daily) p
-       	join (select symbol, date, adjusted_close, row_number() over (partition by symbol order by date asc) rownum from prices_daily) p2 on p.symbol = p2.symbol and p2.rownum = p.rownum+1
+       	join (select symbol, date, adjusted_close, row_number() over (partition by symbol order by date asc) rownum from prices_daily) p2 on p.symbol = p2.symbol and p2.rownum = p.rownum+{}
        	left join earnings e on p.symbol = e.symbol and p.date = e.date
        	where p.symbol = '{}' 
        	and e.date is null
        	order by p.symbol, p.date asc      
-        '''.format(symbol)
+        '''.format(offset_days, symbol)
     
     df = execute_query(query)
     df = df.set_index('date')
@@ -63,10 +63,12 @@ def train_model(symbol, analyze = True):
     # Calculate some features    
     df['sma_25'] = df['adjusted_close'].rolling(25).mean()
     df['sma_50'] = df['adjusted_close'].rolling(50).mean()
-    df['sma_25_slope_5_day'] = df['sma_25'].diff()/5
-    df['sma_50_slope_5_day'] = df['sma_50'].diff()/5
+    df['sma_25_slope_5_day'] = df['sma_25'].diff(periods=5)/5
+    df['sma_50_slope_5_day'] = df['sma_50'].diff(periods=5)/5
     df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25']
     df['close_sma50_delta'] = df['adjusted_close'] - df['sma_50']
+    df['close_sma25_pct_delta'] = (df['adjusted_close'] - df['sma_25'])/df['adjusted_close']
+    df['close_sma50_pct_delta'] = (df['adjusted_close'] - df['sma_50'])/df['adjusted_close']
     
     df = df.dropna()
     df = df.sort_index()
@@ -79,6 +81,9 @@ def train_model(symbol, analyze = True):
     close_change = close_change.set_index('date')
     close_change.sort_index()   
     close_change = close_change[close_change.index >= min_date]
+    
+    max_date = max(close_change.index)
+    df = df[df.index <= max_date]
 
     X = df.to_numpy()
     y = close_change['close_change'].to_numpy()

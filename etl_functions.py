@@ -180,4 +180,62 @@ def execute_query(query):
     df = pd.read_sql(query, con=engine)
     
     return df
+
+def update_indices():
+    
+    host = 'localhost'
+    database = 'stocks'
+    
+    engine_string = 'mysql+pymysql://{}:{}@{}/{}'.format(k.get_password("mysql","username"), k.get_password("mysql","password"), host, database)
+    engine = create_engine(engine_string)
+    del(engine_string)
+    
+    symbols = ['SPY',
+               'VXX',
+               'VTI',
+               'QQQ',
+               'IWV',
+               'IWM']
+    
+    cols = ['symbol',
+            'date',
+            'open',
+            'high',
+            'low',
+            'close',
+            'adjusted_close',
+            'volume',
+            'dividend_amount',
+            'split_coefficient']
+    
+    dcols = ['date',
+            'open',
+            'high',
+            'low',
+            'close',
+            'adjusted_close',
+            'volume',
+            'dividend_amount',
+            'split_coefficient']  
+    
+    prices = pd.DataFrame(columns = cols)    
+    
+    for symbol in symbols:
+        try:
+            df = fetch_daily_adjusted(symbol)
+        except:
+            time.sleep(60)
+            try:
+                df = fetch_daily_adjusted(symbol)
+            except:
+                print('Error getting daily price data for {}'.format(symbol))
+                continue
+        df = df.reset_index()      
+        df.columns = dcols        
+        df['symbol']= symbol
+        prices = prices.append(df)
+    
+    table = "indices_daily"
+    
+    prices.to_sql(table, con = engine, if_exists='replace')
     

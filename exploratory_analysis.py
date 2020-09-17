@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-symbol = 'KO'
+symbol = 'LLY'
 
 query = '''
     select p.date,
@@ -29,11 +29,13 @@ query = '''
            t.aroon_up - t.aroon_down net_aroon,
            t.cci,
            t.chaikin_ad,
-           t.obv
+           t.obv,
+           v.close as vix
            
     from prices_daily p
     join technicals_daily t on p.symbol = t.symbol and p.date = t.date
     left join earnings e on p.symbol = e.symbol and p.date = e.date
+    left join indices_daily v on p.date = v.date and v.symbol = 'VXX'
     where e.date is null
     and p.symbol = '{}'
     order by p.symbol, p.date asc        
@@ -89,13 +91,13 @@ df['up_down_5_day'] = np.where(df['close_change_pct_5_day'] > 0, 'up', 'down')
 df['close_sma25_delta'] = df['adjusted_close'] - df['sma_25_corrected']
 df['close_ema25_delta'] = df['adjusted_close'] - df['ema_25']
 df['sma_25_slope_1_day'] = df['sma_25_corrected'].diff()
-df['sma_25_slope_5_day'] = df['sma_25_corrected'].diff()/5
+df['sma_25_slope_5_day'] = df['sma_25_corrected'].diff(periods=5)/5
+df['sma_25_slope_25_day'] = df['sma_25_corrected'].diff(periods=25)/25
 df['sma_25_slope_direction_5_day'] = np.where(df['sma_25_slope_5_day'] > 0, 'up', 'down')
 
 df.pivot_table(values = 'date',index = 'up_down_5_day', columns = 'sma_25_slope_direction_5_day', aggfunc = 'count')
 
-feature = 'close_sma25_delta'
-feature2 = 'chaikin_ad'
+
 
 plt.figure()
 sns.distplot(df[feature])
@@ -104,18 +106,13 @@ plt.figure()
 sns.violinplot(x = 'sma_25_slope_direction_5_day', y = 'close_change_pct_5_day', data = df)
 
 plt.figure()
-sns.jointplot(x = feature, y = 'close_change_1_day', data = df, kind = "reg")
+sns.jointplot(x = 'sma_25_slope_1_day', y = 'close_change_pct_5_day', data = df, kind = "reg")
 
 plt.figure()
-sns.jointplot(x = feature2, y = 'close_change_pct_5_day', data = df, kind = "reg")
-
-# Filtering to move it past the July 2012 KO stock split
-df_filtered = df[df['date'] >= '2013-01-01']
+sns.jointplot(x = 'sma_25_slope_5_day', y = 'close_change_pct_5_day', data = df, kind = "reg")
 
 plt.figure()
-sns.jointplot(x = feature, y = 'close_change_pct_5_day', data = df_filtered, kind = "reg")
+sns.jointplot(x = 'sma_25_slope_25_day', y = 'close_change_pct_5_day', data = df, kind = "reg")
 
 plt.figure()
-sns.jointplot(x = feature2, y = 'close_change_pct_5_day', data = df_filtered, kind = "reg")
-
-
+sns.jointplot(x = 'vix', y = 'close_change_pct_5_day', data = df, kind = "reg")

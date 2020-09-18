@@ -21,14 +21,14 @@ def refresh_data(symbols):
     update_earnings(symbols)
     print('{} - Finished refreshing data'.format(datetime.now().strftime("%H:%M:%S")))
 
-def refresh_models(symbols):
+def refresh_models(symbols, offset_days = 1):
 
     current_date = date.today()
     
     print('{} - Training models'.format(datetime.now().strftime("%H:%M:%S")))
     for symbol in symbols:
         print('{} - Modeling {}'.format(datetime.now().strftime("%H:%M:%S"), symbol))
-        train_model(symbol)
+        train_model(symbol, offset_days)
     
     loss = []
     train_loss = []
